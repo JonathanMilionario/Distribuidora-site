@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Dashboard')}"></head>
+<body class="bg-light d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="container-fluid px-4 py-4">
+    <!-- Feedback Alerts -->
+    <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i><span th:text="${successMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i><span th:text="${errorMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">Painel Geral da Distribuidora</h2>
+            <p class="text-muted mb-0">Acompanhamento financeiro, estoque, lucratividade e entregas</p>
+        </div>
+        <div>
+            <a th:href="@{/cash}" class="btn btn-outline-success me-2"><i class="bi bi-wallet2 me-1"></i> Caixa do Dia</a>
+            <a th:href="@{/pdv}" class="btn btn-primary me-2"><i class="bi bi-plus-lg me-1"></i> Nova Venda (PDV)</a>
+            <a th:href="@{/estoque}" class="btn btn-outline-dark"><i class="bi bi-boxes me-1"></i> Gerenciar Estoque</a>
+        </div>
+    </div>
+
+    <!-- Indicador de Caixa do Dia (Hoje) -->
+    <div class="card shadow-sm border-0 mb-4 bg-white">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary-soft p-2 rounded-circle me-3">
+                        <i class="bi bi-wallet2 fs-3 text-primary"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-0">Indicador de Caixa do Dia</h4>
+                        <small class="text-muted">Hoje (<span th:text="${dailyReport.date}"></span>) • Status: 
+                            <span class="badge" th:classappend="${dailyReport.status == 'ABERTO' ? 'bg-success' : 'bg-danger'}" th:text="${dailyReport.status}">ABERTO</span>
+                        </small>
+                    </div>
+                </div>
+                <a th:href="@{/cash}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-arrow-right-circle me-1"></i> Ver Relatório Completo do Caixa
+                </a>
+            </div>
+
+            <!-- Quebra de Caixa Alert -->
+            <div th:if="${dailyReport.hasCashShortage}" class="alert alert-danger mb-3 d-flex align-items-center py-2 px-3 rounded-3">
+                <i class="bi bi-exclamation-triangle-fill fs-4 text-danger me-2"></i>
+                <div class="flex-grow-1">
+                    <span class="fw-bold">⚠️ ATENÇÃO: TEVE QUEBRA DE CAIXA! Falta de R$ <span th:text="${#numbers.formatDecimal(dailyReport.cashDifference.abs(), 1, 'POINT', 2, 'COMMA')}"></span> na gaveta.</span>
+                </div>
+                <a th:href="@{/cash}" class="btn btn-sm btn-danger">Conferir</a>
+            </div>
+
+            <div th:if="${dailyReport.isCounted and dailyReport.isCashBalanced}" class="alert alert-success mb-3 d-flex align-items-center py-2 px-3 rounded-3">
+                <i class="bi bi-check-circle-fill fs-4 text-success me-2"></i>
+                <div class="flex-grow-1">
+                    <span class="fw-bold">✅ CAIXA CORRETO: SEM QUEBRA DE CAIXA!</span> O dinheiro físico contado confere com o sistema.
+                </div>
+                <a th:href="@{/cash}" class="btn btn-sm btn-success">Ver</a>
+            </div>
+
+            <div th:if="${!dailyReport.isCounted}" class="alert alert-warning mb-3 d-flex align-items-center py-2 px-3 rounded-3">
+                <i class="bi bi-question-circle-fill fs-4 text-warning me-2"></i>
+                <div class="flex-grow-1">
+                    <span class="fw-bold">Aguardando conferência física da gaveta.</span> Conte as cédulas e moedas para apurar se há quebra.
+                </div>
+                <a th:href="@{/cash}" class="btn btn-sm btn-warning fw-bold">Conferir Agora</a>
+            </div>
+
+            <!-- Resumo Financeiro do Dia -->
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded-3">
+                        <small class="text-muted fw-semibold">TOTAL DE VENDAS HOJE</small>
+                        <h4 class="fw-bold text-success mb-0">R$ <span th:text="${#numbers.formatDecimal(dailyReport.totalSales, 1, 'POINT', 2, 'COMMA')}">0,00</span></h4>
+                        <small class="text-muted"><span class="fw-bold" th:text="${dailyReport.totalOrdersCount}">0</span> pedidos hoje</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded-3">
+                        <small class="text-muted fw-semibold">LUCRO DO DIA</small>
+                        <h4 class="fw-bold text-primary mb-0">R$ <span th:text="${#numbers.formatDecimal(dailyReport.totalProfit, 1, 'POINT', 2, 'COMMA')}">0,00</span></h4>
+                        <small class="text-muted">Margem líquida das vendas</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded-3">
+                        <small class="text-muted fw-semibold">SALDO ESPERADO (GAVETA)</small>
+                        <h4 class="fw-bold text-dark mb-0">R$ <span th:text="${#numbers.formatDecimal(dailyReport.expectedCash, 1, 'POINT', 2, 'COMMA')}">0,00</span></h4>
+                        <small class="text-muted">Fundo + Vendas em Dinheiro</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded-3">
+                        <small class="text-muted fw-semibold">MERCADORIAS VENDIDAS</small>
+                        <h4 class="fw-bold text-dark mb-0"><span th:text="${dailyReport.soldProducts.size()}">0</span> itens</h4>
+                        <small class="text-muted">Produtos distintos faturados</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumo das Mercadorias Vendidas no Dia -->
+            <div th:if="${!#lists.isEmpty(dailyReport.soldProducts)}" class="mt-3">
+                <div class="small fw-bold text-muted mb-2">Mercadorias vendidas hoje:</div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Produto</th>
+                                <th>Embalagem</th>
+                                <th class="text-center">Qtd</th>
+                                <th class="text-end">Preço Unit. Venda</th>
+                                <th class="text-end">Preço Custo</th>
+                                <th class="text-end">Total Faturado</th>
+                                <th class="text-end">Lucro</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="prod, iter : ${dailyReport.soldProducts}" th:if="${iter.index < 4}">
+                                <td class="fw-bold" th:text="${prod.productName}"></td>
+                                <td th:text="${prod.unitType}"></td>
+                                <td class="text-center fw-bold" th:text="${prod.quantitySold}"></td>
+                                <td class="text-end text-primary fw-semibold">R$ <span th:text="${#numbers.formatDecimal(prod.unitPrice, 1, 'POINT', 2, 'COMMA')}"></span></td>
+                                <td class="text-end text-muted">R$ <span th:text="${#numbers.formatDecimal(prod.costPrice, 1, 'POINT', 2, 'COMMA')}"></span></td>
+                                <td class="text-end fw-bold">R$ <span th:text="${#numbers.formatDecimal(prod.totalRevenue, 1, 'POINT', 2, 'COMMA')}"></span></td>
+                                <td class="text-end text-success fw-bold">+ R$ <span th:text="${#numbers.formatDecimal(prod.totalProfit, 1, 'POINT', 2, 'COMMA')}"></span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards 1: Lucratividade e Estoque -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card card-stat shadow-sm p-3 bg-white h-100 border-start border-4 border-primary">
+                <div class="text-muted small fw-semibold text-uppercase">Custo Total Investido</div>
+                <div class="h3 fw-bold text-dark mt-1" th:text="'R$ ' + ${#numbers.formatDecimal(totalStockCost, 1, 'POINT', 2, 'COMMA')}">R$ 0,00</div>
+                <div class="small text-muted"><i class="bi bi-box-seam me-1"></i>Patrimônio estocado em depósito</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-stat shadow-sm p-3 bg-white h-100 border-start border-4 border-warning">
+                <div class="text-muted small fw-semibold text-uppercase">Faturamento Previsto</div>
+                <div class="h3 fw-bold text-warning mt-1" th:text="'R$ ' + ${#numbers.formatDecimal(totalStockSale, 1, 'POINT', 2, 'COMMA')}">R$ 0,00</div>
+                <div class="small text-muted"><i class="bi bi-graph-up me-1"></i>Preço de venda total</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-stat shadow-sm p-3 bg-white h-100 border-start border-4 border-success">
+                <div class="text-muted small fw-semibold text-uppercase">Lucro Previsto no Estoque</div>
+                <div class="h3 fw-bold text-success mt-1" th:text="'+ R$ ' + ${#numbers.formatDecimal(totalProjectedProfit, 1, 'POINT', 2, 'COMMA')}">+ R$ 0,00</div>
+                <div class="small text-success fw-semibold"><i class="bi bi-arrow-up-circle me-1"></i><span th:text="${#numbers.formatDecimal(averageMargin, 1, 'POINT', 1, 'COMMA')} + '% Margem Média'"></span></div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card card-stat shadow-sm p-3 bg-white h-100 border-start border-4 border-danger">
+                <div class="text-muted small fw-semibold text-uppercase">Contas a Receber (Fiado)</div>
+                <div class="h3 fw-bold text-danger mt-1" th:text="'R$ ' + ${#numbers.formatDecimal(totalReceivables, 1, 'POINT', 2, 'COMMA')}">R$ 0,00</div>
+                <div class="small text-muted"><i class="bi bi-arrow-return-left me-1"></i><span th:text="${totalPendingBottles} + ' cascos pendentes'"></span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert de Estoque Baixo se houver -->
+    <div th:if="${!lowStockProducts.isEmpty()}" class="alert alert-warning shadow-sm mb-4">
+        <h5 class="alert-heading fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Atenção: Bebidas com Estoque Baixo ou Crítico!</h5>
+        <div class="row row-cols-1 row-cols-md-3 g-2 mt-2">
+            <div th:each="prod : ${lowStockProducts}" class="col">
+                <div class="p-2 bg-white rounded border d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong th:text="${prod.name}"></strong><br>
+                        <span class="badge bg-danger" th:text="'Estoque: ' + ${prod.stockQuantity} + ' ' + ${prod.unitType}"></span>
+                        <span class="text-muted small" th:text="'(Mín: ' + ${prod.minStock} + ')'"></span>
+                    </div>
+                    <form th:action="@{/estoque/ajuste}" method="post" class="d-inline">
+                        <input type="hidden" name="productId" th:value="${prod.id}"/>
+                        <input type="hidden" name="type" value="ENTRADA"/>
+                        <input type="hidden" name="delta" value="20"/>
+                        <input type="hidden" name="reason" value="Reposição Rápida de Fornecedor"/>
+                        <button type="submit" class="btn btn-sm btn-success">+ 20 un</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vendas Recentes & Atalhos -->
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-receipt me-2"></i>Últimos Pedidos / Vendas Realizadas</h5>
+                    <a th:href="@{/pedidos}" class="btn btn-sm btn-outline-primary">Ver Todos</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Pedido</th>
+                                <th>Cliente</th>
+                                <th>Data/Hora</th>
+                                <th>Pagamento</th>
+                                <th>Status</th>
+                                <th class="text-end">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="order : ${recentOrders}">
+                                <td><strong th:text="${order.orderNumber}"></strong></td>
+                                <td th:text="${order.clientName}"></td>
+                                <td th:text="${#temporals.format(order.timestamp, 'dd/MM/yyyy HH:mm')}"></td>
+                                <td>
+                                    <span class="badge bg-secondary" th:text="${order.paymentMethod}"></span>
+                                    <span th:if="${order.paymentStatus == 'PAGO'}" class="badge bg-success ms-1">PAGO</span>
+                                    <span th:if="${order.paymentStatus == 'PENDENTE'}" class="badge bg-danger ms-1">PENDENTE</span>
+                                </td>
+                                <td>
+                                    <span th:if="${order.orderStatus == 'CONCLUIDO'}" class="badge bg-success">Concluído</span>
+                                    <span th:if="${order.orderStatus == 'EM_SEPARACAO'}" class="badge bg-warning text-dark">Em Separação</span>
+                                    <span th:if="${order.orderStatus == 'EM_ROTA'}" class="badge bg-info text-dark">Em Rota</span>
+                                </td>
+                                <td class="text-end fw-bold" th:text="'R$ ' + ${#numbers.formatDecimal(order.totalAmount, 1, 'POINT', 2, 'COMMA')}"></td>
+                            </tr>
+                            <tr th:if="${recentOrders.isEmpty()}">
+                                <td colspan="6" class="text-center py-4 text-muted">Nenhum pedido realizado ainda.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-lightning-charge me-2"></i>Ações Rápidas</h5>
+                </div>
+                <div class="card-body d-grid gap-2">
+                    <a th:href="@{/pdv}" class="btn btn-primary py-2 text-start">
+                        <i class="bi bi-cart-plus me-2"></i><strong>Abrir PDV</strong>
+                        <div class="small opacity-75">Vender fardos, caixas e caixas com baixa no estoque</div>
+                    </a>
+                    <a th:href="@{/estoque}" class="btn btn-outline-dark py-2 text-start">
+                        <i class="bi bi-plus-circle me-2"></i><strong>Cadastrar Nova Bebida</strong>
+                        <div class="small text-muted">Definir preço de custo, venda e margem</div>
+                    </a>
+                    <a th:href="@{/clientes}" class="btn btn-outline-dark py-2 text-start">
+                        <i class="bi bi-person-plus me-2"></i><strong>Gerenciar Clientes</strong>
+                        <div class="small text-muted">Controle de fiado e cascos retornáveis</div>
+                    </a>
+                    <a th:href="@{/movimentacoes}" class="btn btn-outline-secondary py-2 text-start">
+                        <i class="bi bi-journal-text me-2"></i><strong>Auditoria de Estoque</strong>
+                        <div class="small text-muted">Histórico de cargas, vendas e perdas</div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+</body>
+</html>

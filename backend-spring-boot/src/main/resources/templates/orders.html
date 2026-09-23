@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Pedidos e Vendas')}"></head>
+<body class="bg-light d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="container-fluid px-4 py-4">
+    <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i><span th:text="${successMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">Histórico de Pedidos & Vendas</h2>
+            <p class="text-muted mb-0">Controle de entregas, faturamento e baixas financeiras</p>
+        </div>
+        <a th:href="@{/pdv}" class="btn btn-primary"><i class="bi bi-cart-plus me-1"></i> Nova Venda (PDV)</a>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nº Pedido</th>
+                        <th>Cliente</th>
+                        <th>Data/Hora</th>
+                        <th>Itens</th>
+                        <th>Pagamento</th>
+                        <th>Status do Pedido</th>
+                        <th class="text-end">Custo Total</th>
+                        <th class="text-end">Valor Venda</th>
+                        <th class="text-end">Lucro Bruto</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="order : ${orders}">
+                        <td><strong th:text="${order.orderNumber}"></strong></td>
+                        <td>
+                            <span th:text="${order.clientName}"></span>
+                            <div th:if="${order.isDelivery}" class="small text-primary"><i class="bi bi-truck me-1"></i>Entrega</div>
+                        </td>
+                        <td th:text="${#temporals.format(order.timestamp, 'dd/MM/yyyy HH:mm')}"></td>
+                        <td>
+                            <ul class="list-unstyled mb-0 small">
+                                <li th:each="item : ${order.items}">
+                                    <span th:text="${item.quantity} + 'x ' + ${item.productName}"></span>
+                                </li>
+                            </ul>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary" th:text="${order.paymentMethod}"></span>
+                            <span th:if="${order.paymentStatus == 'PAGO'}" class="badge bg-success ms-1">PAGO</span>
+                            <span th:if="${order.paymentStatus == 'PENDENTE'}" class="badge bg-danger ms-1">PENDENTE</span>
+                        </td>
+                        <td>
+                            <span th:if="${order.orderStatus == 'CONCLUIDO'}" class="badge bg-success">Concluído</span>
+                            <span th:if="${order.orderStatus == 'EM_SEPARACAO'}" class="badge bg-warning text-dark">Em Separação</span>
+                            <span th:if="${order.orderStatus == 'EM_ROTA'}" class="badge bg-info text-dark">Em Rota</span>
+                            <span th:if="${order.orderStatus == 'CANCELADO'}" class="badge bg-danger">Cancelado</span>
+                        </td>
+                        <td class="text-end text-muted small" th:text="'R$ ' + ${#numbers.formatDecimal(order.totalCost, 1, 'POINT', 2, 'COMMA')}"></td>
+                        <td class="text-end fw-bold text-primary" th:text="'R$ ' + ${#numbers.formatDecimal(order.totalAmount, 1, 'POINT', 2, 'COMMA')}"></td>
+                        <td class="text-end fw-bold text-success" th:text="'+ R$ ' + ${#numbers.formatDecimal(order.grossProfit, 1, 'POINT', 2, 'COMMA')}"></td>
+                        <td class="text-center">
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    Status
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <form th:action="@{/pedidos/{id}/status(id=${order.id})}" method="post">
+                                            <input type="hidden" name="status" value="EM_ROTA"/>
+                                            <button type="submit" class="dropdown-item"><i class="bi bi-truck me-2"></i>Marcar Em Rota</button>
+                                        </form>
+                                    </li>
+                                    <li>
+                                        <form th:action="@{/pedidos/{id}/status(id=${order.id})}" method="post">
+                                            <input type="hidden" name="status" value="CONCLUIDO"/>
+                                            <button type="submit" class="dropdown-item"><i class="bi bi-check-circle me-2"></i>Marcar Concluído</button>
+                                        </form>
+                                    </li>
+                                    <li th:if="${order.paymentStatus == 'PENDENTE'}">
+                                        <hr class="dropdown-divider">
+                                        <form th:action="@{/pedidos/{id}/pagar(id=${order.id})}" method="post">
+                                            <button type="submit" class="dropdown-item text-success"><i class="bi bi-cash me-2"></i>Confirmar Pagamento</button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr th:if="${orders.isEmpty()}">
+                        <td colspan="10" class="text-center py-4 text-muted">Nenhum pedido cadastrado ainda.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+</body>
+</html>

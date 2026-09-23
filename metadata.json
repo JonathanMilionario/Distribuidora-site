@@ -1,0 +1,7 @@
+{
+  "name": "DistriBebidas",
+  "description": "Sistema completo de gestão de estoque e vendas para Distribuidora de Bebidas",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

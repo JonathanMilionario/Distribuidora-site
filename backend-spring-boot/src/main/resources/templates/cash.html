@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Caixa do Dia')}"></head>
+<body class="bg-light">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<div class="container-fluid px-4 py-4">
+
+    <!-- Top Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-wallet2 text-primary me-2"></i>Caixa do Dia</h2>
+            <p class="text-muted mb-0">Referência: <span class="fw-bold text-dark" th:text="${report.date}">Hoje</span> • Status atual:
+                <span class="badge" th:classappend="${report.status == 'ABERTO' ? 'bg-success' : 'bg-danger'}" th:text="${report.status}">ABERTO</span>
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalOpeningFloat">
+                <i class="bi bi-sliders me-1"></i> Fundo de Troco
+            </button>
+            <form th:if="${report.status == 'ABERTO'}" th:action="@{/cash/close}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-danger" onclick="return confirm('Deseja fechar o caixa do dia?')">
+                    <i class="bi bi-lock-fill me-1"></i> Fechar Caixa
+                </button>
+            </form>
+            <form th:if="${report.status == 'FECHADO'}" th:action="@{/cash/reopen}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-outline-success">
+                    <i class="bi bi-unlock-fill me-1"></i> Reabrir Caixa
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 1. INDICADOR PRINCIPAL: TEVE QUEBRA DE CAIXA? -->
+    <div class="mb-4">
+        <div th:if="${report.hasCashShortage}" class="alert alert-danger shadow-sm border-2 border-danger d-flex align-items-center p-3 rounded-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill fs-2 text-danger me-3"></i>
+            <div>
+                <h5 class="alert-heading fw-bold mb-1">⚠️ TEVE QUEBRA DE CAIXA: Falta de R$ <span th:text="${#numbers.formatDecimal(report.cashDifference.abs(), 1, 'POINT', 2, 'COMMA')}">0,00</span></h5>
+                <p class="mb-0">O valor físico contado na gaveta (R$ <span th:text="${#numbers.formatDecimal(report.countedCash, 1, 'POINT', 2, 'COMMA')}">0,00</span>) é menor que o saldo esperado no sistema (R$ <span th:text="${#numbers.formatDecimal(report.expectedCash, 1, 'POINT', 2, 'COMMA')}">0,00</span>).</p>
+            </div>
+            <button class="btn btn-danger btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#modalCountCash">Recontar Gaveta</button>
+        </div>
+
+        <div th:if="${report.isCounted and report.isCashBalanced}" class="alert alert-success shadow-sm border-2 border-success d-flex align-items-center p-3 rounded-3" role="alert">
+            <i class="bi bi-check-circle-fill fs-2 text-success me-3"></i>
+            <div>
+                <h5 class="alert-heading fw-bold mb-1">✅ SEM QUEBRA DE CAIXA: Saldo 100% Correto!</h5>
+                <p class="mb-0">O dinheiro físico contado na gaveta confere exatamente com todas as vendas e movimentações apuradas hoje.</p>
+            </div>
+            <button class="btn btn-outline-success btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#modalCountCash">Ajustar Contagem</button>
+        </div>
+
+        <div th:if="${report.hasCashSurplus}" class="alert alert-info shadow-sm border-2 border-info d-flex align-items-center p-3 rounded-3" role="alert">
+            <i class="bi bi-info-circle-fill fs-2 text-info me-3"></i>
+            <div>
+                <h5 class="alert-heading fw-bold mb-1">ℹ️ SOBRA DE CAIXA: Excedente de R$ <span th:text="${#numbers.formatDecimal(report.cashDifference, 1, 'POINT', 2, 'COMMA')}">0,00</span></h5>
+                <p class="mb-0">Há mais dinheiro na gaveta do que o apurado teoricamente no sistema.</p>
+            </div>
+            <button class="btn btn-info btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#modalCountCash">Recontar</button>
+        </div>
+
+        <div th:if="${!report.isCounted}" class="alert alert-warning shadow-sm border-2 border-warning d-flex align-items-center p-3 rounded-3" role="alert">
+            <i class="bi bi-question-circle-fill fs-2 text-warning me-3"></i>
+            <div>
+                <h5 class="alert-heading fw-bold mb-1">ℹ️ Conferência da Gaveta Pendente</h5>
+                <p class="mb-0">Informe o valor em dinheiro físico contado na gaveta para verificar se houve quebra de caixa ou se o saldo está correto.</p>
+            </div>
+            <button class="btn btn-warning btn-sm ms-auto fw-bold" data-bs-toggle="modal" data-bs-target="#modalCountCash">
+                <i class="bi bi-cash-stack me-1"></i> Conferir Dinheiro
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. KPIS GERAIS DO DIA -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card card-stat shadow-sm p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small fw-semibold">TOTAL DE VENDAS HOJE</span>
+                    <i class="bi bi-graph-up-arrow text-success fs-4"></i>
+                </div>
+                <h3 class="fw-bold text-success mb-1">R$ <span th:text="${#numbers.formatDecimal(report.totalSales, 1, 'POINT', 2, 'COMMA')}">0,00</span></h3>
+                <span class="text-muted small"><span class="fw-bold" th:text="${report.totalOrdersCount}">0</span> pedidos finalizados</span>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card card-stat shadow-sm p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small fw-semibold">LUCRO DO DIA</span>
+                    <i class="bi bi-currency-dollar text-primary fs-4"></i>
+                </div>
+                <h3 class="fw-bold text-primary mb-1">R$ <span th:text="${#numbers.formatDecimal(report.totalProfit, 1, 'POINT', 2, 'COMMA')}">0,00</span></h3>
+                <span class="text-muted small">Margem líquida sobre custo</span>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card card-stat shadow-sm p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small fw-semibold">SALDO ESPERADO (GAVETA)</span>
+                    <i class="bi bi-cash text-warning fs-4"></i>
+                </div>
+                <h3 class="fw-bold text-dark mb-1">R$ <span th:text="${#numbers.formatDecimal(report.expectedCash, 1, 'POINT', 2, 'COMMA')}">0,00</span></h3>
+                <span class="text-muted small">Fundo + Vendas Espécie ± Mov.</span>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card card-stat shadow-sm p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted small fw-semibold">DINHEIRO CONTADO</span>
+                    <i class="bi bi-safe text-secondary fs-4"></i>
+                </div>
+                <h3 class="fw-bold mb-1" th:classappend="${report.hasCashShortage ? 'text-danger' : (report.isCashBalanced and report.isCounted ? 'text-success' : 'text-dark')}">
+                    <span th:if="${report.isCounted}">R$ <span th:text="${#numbers.formatDecimal(report.countedCash, 1, 'POINT', 2, 'COMMA')}">0,00</span></span>
+                    <span th:if="${!report.isCounted}" class="fs-5 text-muted">Aguardando contagem</span>
+                </h3>
+                <span class="text-muted small">
+                    <span th:if="${report.hasCashShortage}" class="text-danger fw-bold">Quebra: -R$ <span th:text="${#numbers.formatDecimal(report.cashDifference.abs(), 1, 'POINT', 2, 'COMMA')}"></span></span>
+                    <span th:if="${report.isCashBalanced and report.isCounted}" class="text-success fw-bold">100% Conferido</span>
+                    <span th:if="${!report.isCounted}">Clique em Conferir</span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. DETALHAMENTO DA GAVETA & MEIOS DE PAGAMENTO -->
+    <div class="row g-4 mb-4">
+        <!-- Gaveta de Dinheiro Físico -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-calculator me-2 text-primary"></i>Conferência e Movimentações da Gaveta</h5>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalBleeding">
+                            <i class="bi bi-dash-circle me-1"></i> Sangria
+                        </button>
+                        <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalSupply">
+                            <i class="bi bi-plus-circle me-1"></i> Suprimento
+                        </button>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCountCash">
+                            <i class="bi bi-check2-square me-1"></i> Contar Gaveta
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <table class="table table-bordered align-middle mb-0">
+                        <tbody>
+                            <tr>
+                                <td class="text-muted">Fundo de Troco Inicial (Abertura)</td>
+                                <td class="text-end fw-semibold">R$ <span th:text="${#numbers.formatDecimal(report.openingFloat, 1, 'POINT', 2, 'COMMA')}">0,00</span></td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">(+) Vendas em Dinheiro Hoje</td>
+                                <td class="text-end text-success fw-semibold">+ R$ <span th:text="${#numbers.formatDecimal(report.cashSales, 1, 'POINT', 2, 'COMMA')}">0,00</span></td>
+                            </tr>
+                            <tr th:if="${report.suppliesAmount > 0}">
+                                <td class="text-muted">(+) Suprimentos de Caixa</td>
+                                <td class="text-end text-success fw-semibold">+ R$ <span th:text="${#numbers.formatDecimal(report.suppliesAmount, 1, 'POINT', 2, 'COMMA')}">0,00</span></td>
+                            </tr>
+                            <tr th:if="${report.bleedingsAmount > 0}">
+                                <td class="text-muted">(-) Sangrias / Retiradas de Caixa</td>
+                                <td class="text-end text-danger fw-semibold">- R$ <span th:text="${#numbers.formatDecimal(report.bleedingsAmount, 1, 'POINT', 2, 'COMMA')}">0,00</span></td>
+                            </tr>
+                            <tr class="table-light">
+                                <td class="fw-bold">(=) Saldo Esperado em Dinheiro Físico</td>
+                                <td class="text-end fw-bold fs-6">R$ <span th:text="${#numbers.formatDecimal(report.expectedCash, 1, 'POINT', 2, 'COMMA')}">0,00</span></td>
+                            </tr>
+                            <tr>
+                                <td class="fw-bold">Dinheiro Físico Contado</td>
+                                <td class="text-end fw-bold">
+                                    <span th:if="${report.isCounted}">R$ <span th:text="${#numbers.formatDecimal(report.countedCash, 1, 'POINT', 2, 'COMMA')}">0,00</span></span>
+                                    <span th:if="${!report.isCounted}" class="text-muted">Pendente de contagem</span>
+                                </td>
+                            </tr>
+                            <tr th:classappend="${report.hasCashShortage ? 'table-danger' : (report.isCashBalanced and report.isCounted ? 'table-success' : 'table-light')}">
+                                <td class="fw-bold">Diferença Apurada (Quebra/Sobra)</td>
+                                <td class="text-end fw-bold">
+                                    <span th:if="${report.hasCashShortage}" class="text-danger">QUEBRA DE CAIXA: -R$ <span th:text="${#numbers.formatDecimal(report.cashDifference.abs(), 1, 'POINT', 2, 'COMMA')}">0,00</span></span>
+                                    <span th:if="${report.isCashBalanced and report.isCounted}" class="text-success">SEM QUEBRA (Exato: R$ 0,00)</span>
+                                    <span th:if="${report.hasCashSurplus}" class="text-primary">SOBRA: +R$ <span th:text="${#numbers.formatDecimal(report.cashDifference, 1, 'POINT', 2, 'COMMA')}">0,00</span></span>
+                                    <span th:if="${!report.isCounted}" class="text-muted">Não conferido</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vendas por Forma de Pagamento -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white py-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-pie-chart me-2 text-primary"></i>Vendas por Meio de Pagamento</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div><i class="bi bi-cash me-2 text-success"></i>Dinheiro</div>
+                            <span class="fw-bold">R$ <span th:text="${#numbers.formatDecimal(report.cashSales, 1, 'POINT', 2, 'COMMA')}">0,00</span></span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div><i class="bi bi-qr-code me-2 text-primary"></i>PIX</div>
+                            <span class="fw-bold">R$ <span th:text="${#numbers.formatDecimal(report.pixSales, 1, 'POINT', 2, 'COMMA')}">0,00</span></span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div><i class="bi bi-credit-card me-2 text-info"></i>Cartão de Crédito</div>
+                            <span class="fw-bold">R$ <span th:text="${#numbers.formatDecimal(report.creditSales, 1, 'POINT', 2, 'COMMA')}">0,00</span></span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div><i class="bi bi-credit-card-2-front me-2 text-secondary"></i>Cartão de Débito</div>
+                            <span class="fw-bold">R$ <span th:text="${#numbers.formatDecimal(report.debitSales, 1, 'POINT', 2, 'COMMA')}">0,00</span></span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div><i class="bi bi-receipt me-2 text-warning"></i>Faturado / Fiado</div>
+                            <span class="fw-bold">R$ <span th:text="${#numbers.formatDecimal(report.fiadoSales, 1, 'POINT', 2, 'COMMA')}">0,00</span></span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. QUAIS MERCADORIAS FORAM VENDIDAS NO DIA (TABELA DETALHADA COM PREÇOS E LUCRO) -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+            <div>
+                <h5 class="fw-bold mb-0"><i class="bi bi-box-seam me-2 text-primary"></i>Mercadorias Vendidas no Dia</h5>
+                <small class="text-muted">Lista detalhada com quantidade, preço unitário de venda, preço de custo, faturamento e lucro</small>
+            </div>
+            <a th:href="@{/pdv}" class="btn btn-primary btn-sm">
+                <i class="bi bi-cart-plus me-1"></i> Abrir PDV / Vender
+            </a>
+        </div>
+        <div class="card-body p-0">
+            <div th:if="${#lists.isEmpty(report.soldProducts)}" class="text-center py-5">
+                <i class="bi bi-cart-x fs-1 text-muted d-block mb-3"></i>
+                <h5 class="text-muted fw-bold">Nenhuma mercadoria vendida hoje ainda.</h5>
+                <p class="text-secondary small">Realize vendas no PDV para alimentar os indicadores de hoje.</p>
+                <a th:href="@{/pdv}" class="btn btn-primary btn-sm">Registrar Venda no PDV</a>
+            </div>
+
+            <div th:if="${!#lists.isEmpty(report.soldProducts)}" class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Produto / Mercadoria</th>
+                            <th>Embalagem</th>
+                            <th class="text-center">Qtd Vendida</th>
+                            <th class="text-end">Preço Unit. Venda</th>
+                            <th class="text-end">Preço de Custo</th>
+                            <th class="text-end">Total Faturado</th>
+                            <th class="text-end">Lucro do Produto</th>
+                            <th class="text-end">Margem %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="prod : ${report.soldProducts}">
+                            <td>
+                                <span class="fw-bold" th:text="${prod.productName}">Produto</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border" th:text="${prod.unitType}">Caixa</span>
+                            </td>
+                            <td class="text-center fw-bold">
+                                <span class="badge bg-primary px-3 py-2 fs-6" th:text="${prod.quantitySold}">0</span>
+                            </td>
+                            <td class="text-end fw-bold text-primary">
+                                R$ <span th:text="${#numbers.formatDecimal(prod.unitPrice, 1, 'POINT', 2, 'COMMA')}">0,00</span>
+                            </td>
+                            <td class="text-end text-muted">
+                                R$ <span th:text="${#numbers.formatDecimal(prod.costPrice, 1, 'POINT', 2, 'COMMA')}">0,00</span>
+                            </td>
+                            <td class="text-end fw-bold">
+                                R$ <span th:text="${#numbers.formatDecimal(prod.totalRevenue, 1, 'POINT', 2, 'COMMA')}">0,00</span>
+                            </td>
+                            <td class="text-end fw-bold text-success">
+                                + R$ <span th:text="${#numbers.formatDecimal(prod.totalProfit, 1, 'POINT', 2, 'COMMA')}">0,00</span>
+                            </td>
+                            <td class="text-end">
+                                <span class="badge bg-success-soft text-success fw-bold" th:text="${prod.marginPercent} + '%'">0.0%</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Conferência de Caixa -->
+<div class="modal fade" id="modalCountCash" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form th:action="@{/cash/count}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-cash-stack text-primary me-2"></i>Conferência Física do Caixa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Conte todas as cédulas e moedas físicas na gaveta e informe o valor total:</p>
+                    <div class="alert alert-secondary p-2 small mb-3">
+                        Saldo Teórico Esperado no Sistema: <strong>R$ <span th:text="${#numbers.formatDecimal(report.expectedCash, 1, 'POINT', 2, 'COMMA')}"></span></strong>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Valor Total Contado (R$)</label>
+                        <input type="number" step="0.01" class="form-control form-control-lg" name="countedCash"
+                               th:value="${report.countedCash != null ? report.countedCash : report.expectedCash}" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observações / Justificativas</label>
+                        <input type="text" class="form-control" name="notes" th:value="${report.notes}" placeholder="Ex: Diferença de moedas">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Conferência</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Sangria -->
+<div class="modal fade" id="modalBleeding" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form th:action="@{/cash/bleeding}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-danger"><i class="bi bi-dash-circle me-2"></i>Registrar Sangria (Retirada)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Valor da Sangria (R$)</label>
+                        <input type="number" step="0.01" class="form-control" name="amount" placeholder="0,00" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Motivo da Retirada</label>
+                        <input type="text" class="form-control" name="reason" placeholder="Ex: Transferência para cofre / pagamento avulso">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Confirmar Sangria</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Suprimento -->
+<div class="modal fade" id="modalSupply" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form th:action="@{/cash/supply}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-success"><i class="bi bi-plus-circle me-2"></i>Registrar Suprimento (Reforço)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Valor do Reforço (R$)</label>
+                        <input type="number" step="0.01" class="form-control" name="amount" placeholder="0,00" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Origem / Motivo</label>
+                        <input type="text" class="form-control" name="reason" placeholder="Ex: Troco inicial extra">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Confirmar Suprimento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Fundo de Troco -->
+<div class="modal fade" id="modalOpeningFloat" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form th:action="@{/cash/opening-float}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-sliders me-2 text-primary"></i>Ajustar Fundo de Troco Inicial</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Fundo de Troco (R$)</label>
+                        <input type="number" step="0.01" class="form-control" name="openingFloat" th:value="${report.openingFloat}" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Fundo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<footer th:replace="~{layout :: footer}"></footer>
+</body>
+</html>

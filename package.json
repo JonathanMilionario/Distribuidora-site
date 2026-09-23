@@ -1,0 +1,10 @@
+{
+  "name": "distribebidas-web",
+  "version": "1.0.0",
+  "description": "Sistema de Gestão de Vendas e Estoque para Distribuidora de Bebidas",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  }
+}

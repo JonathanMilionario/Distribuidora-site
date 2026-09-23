@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Auditoria de Estoque')}"></head>
+<body class="bg-light d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="container-fluid px-4 py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">Auditoria & Histórico de Movimentações</h2>
+            <p class="text-muted mb-0">Rastreabilidade completa de todas as cargas recebidas, vendas e avarias</p>
+        </div>
+        <a th:href="@{/estoque}" class="btn btn-outline-dark"><i class="bi bi-arrow-left me-1"></i> Voltar ao Estoque</a>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data / Hora</th>
+                        <th>Produto</th>
+                        <th>Tipo</th>
+                        <th class="text-center">Qtd Movimentada</th>
+                        <th class="text-center">Estoque Anterior</th>
+                        <th class="text-center">Novo Estoque</th>
+                        <th>Motivo / Justificativa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="m : ${movements}">
+                        <td th:text="${#temporals.format(m.timestamp, 'dd/MM/yyyy HH:mm:ss')}"></td>
+                        <td><strong th:text="${m.productName}"></strong></td>
+                        <td>
+                            <span th:if="${m.type == 'ENTRADA'}" class="badge bg-success"><i class="bi bi-box-arrow-in-down me-1"></i>ENTRADA (+ Carga)</span>
+                            <span th:if="${m.type == 'VENDA'}" class="badge bg-primary"><i class="bi bi-cart me-1"></i>VENDA</span>
+                            <span th:if="${m.type == 'SAIDA'}" class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>AVARIA (- Perda)</span>
+                            <span th:if="${m.type == 'AJUSTE'}" class="badge bg-warning text-dark">AJUSTE</span>
+                        </td>
+                        <td class="text-center fw-bold" th:text="${m.quantity}"></td>
+                        <td class="text-center text-muted" th:text="${m.previousStock}"></td>
+                        <td class="text-center fw-bold" th:text="${m.newStock}"></td>
+                        <td th:text="${m.reason}"></td>
+                    </tr>
+                    <tr th:if="${movements.isEmpty()}">
+                        <td colspan="7" class="text-center py-4 text-muted">Nenhuma movimentação de estoque registrada.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+</body>
+</html>

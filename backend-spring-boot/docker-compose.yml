@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # Banco de Dados PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: distribebidas-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: distribebidas
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Aplicação Web Spring Boot
+  web-app:
+    build: .
+    container_name: distribebidas-web
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=distribebidas
+      - DB_USER=postgres
+      - DB_PASSWORD=postgrespassword
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:

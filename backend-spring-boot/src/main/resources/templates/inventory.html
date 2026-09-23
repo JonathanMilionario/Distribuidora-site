@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Estoque & Lucratividade')}"></head>
+<body class="bg-light d-flex flex-column min-vh-100">
+
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="container-fluid px-4 py-4">
+    <!-- Alerts -->
+    <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i><span th:text="${successMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Header & Summary Cards -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="fw-bold mb-0">Controle de Estoque & Custos</h2>
+            <p class="text-muted mb-0">Gestão de preços de compra, margem de markup e lucro projetado</p>
+        </div>
+        <div>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newProductModal">
+                <i class="bi bi-plus-lg me-1"></i> Cadastrar Bebida
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Bar of Stock Profitability -->
+    <div class="card shadow-sm border-0 mb-4 bg-white">
+        <div class="card-body">
+            <div class="row text-center g-3">
+                <div class="col-md-3 border-end">
+                    <span class="text-muted small text-uppercase fw-bold">Patrimônio em Custo</span>
+                    <h3 class="fw-bold text-dark mt-1" th:text="'R$ ' + ${#numbers.formatDecimal(totalStockCost, 1, 'POINT', 2, 'COMMA')}"></h3>
+                    <small class="text-muted">Valor investido nas compras</small>
+                </div>
+                <div class="col-md-3 border-end">
+                    <span class="text-muted small text-uppercase fw-bold">Faturamento Previsto</span>
+                    <h3 class="fw-bold text-primary mt-1" th:text="'R$ ' + ${#numbers.formatDecimal(totalStockSale, 1, 'POINT', 2, 'COMMA')}"></h3>
+                    <small class="text-muted">Potencial de vendas</small>
+                </div>
+                <div class="col-md-3 border-end">
+                    <span class="text-muted small text-uppercase fw-bold">Lucro Previsto no Estoque</span>
+                    <h3 class="fw-bold text-success mt-1" th:text="'+ R$ ' + ${#numbers.formatDecimal(totalProjectedProfit, 1, 'POINT', 2, 'COMMA')}"></h3>
+                    <small class="text-success fw-bold">Lucro bruto a ser realizado</small>
+                </div>
+                <div class="col-md-3">
+                    <span class="text-muted small text-uppercase fw-bold">Itens Cadastrados</span>
+                    <h3 class="fw-bold text-secondary mt-1" th:text="${products.size()}"></h3>
+                    <small class="text-muted">SKUs no catálogo</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters & Search Toolbar -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <form th:action="@{/estoque}" method="get" class="row g-2 align-items-center">
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                        <input type="text" name="search" th:value="${currentSearch}" class="form-control" placeholder="Buscar por nome, marca ou categoria...">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <select name="sort" class="form-select">
+                        <option value="">Ordenar por: Padrão (Nome)</option>
+                        <option value="lucro-unit" th:selected="${currentSort == 'lucro-unit'}">💰 Maior Lucro Unitário (R$)</option>
+                        <option value="lucro-total" th:selected="${currentSort == 'lucro-total'}">📈 Maior Lucro no Estoque (R$)</option>
+                        <option value="margem" th:selected="${currentSort == 'margem'}">📊 Maior Markup / Margem %</option>
+                        <option value="baixo-estoque" th:selected="${currentSort == 'baixo-estoque'}">⚠️ Apenas Estoque Baixo</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-dark w-100"><i class="bi bi-filter me-1"></i> Filtrar</button>
+                    <a th:href="@{/estoque}" class="btn btn-outline-secondary">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Table of Products -->
+    <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Produto / Categoria</th>
+                        <th>Unidade</th>
+                        <th class="text-end">Preço Custo</th>
+                        <th class="text-end">Preço Venda</th>
+                        <th class="text-end">Lucro Unitário</th>
+                        <th class="text-center">Markup %</th>
+                        <th class="text-center">Estoque Atual</th>
+                        <th class="text-end">Lucro Total em Estoque</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="p : ${products}">
+                        <td>
+                            <strong th:text="${p.name}"></strong>
+                            <div class="small text-muted">
+                                <span class="badge bg-light text-dark border me-1" th:text="${p.category}"></span>
+                                <span th:if="${p.isReturnable}" class="badge bg-info text-dark">Casco Retornável</span>
+                                <span th:if="${p.supplier != null and !p.supplier.empty}" class="ms-1" th:text="'Fornec: ' + ${p.supplier}"></span>
+                            </div>
+                        </td>
+                        <td th:text="${p.unitType}"></td>
+                        <td class="text-end fw-semibold text-secondary" th:text="'R$ ' + ${#numbers.formatDecimal(p.costPrice, 1, 'POINT', 2, 'COMMA')}"></td>
+                        <td class="text-end fw-bold text-primary" th:text="'R$ ' + ${#numbers.formatDecimal(p.salePrice, 1, 'POINT', 2, 'COMMA')}"></td>
+                        <td class="text-end fw-bold text-success" th:text="'+ R$ ' + ${#numbers.formatDecimal(p.unitProfit, 1, 'POINT', 2, 'COMMA')}"></td>
+                        <td class="text-center">
+                            <span class="badge bg-success-soft text-success px-2 py-1" th:text="'+' + ${#numbers.formatDecimal(p.markupPercentage, 1, 'POINT', 1, 'COMMA')} + '%'"></span>
+                        </td>
+                        <td class="text-center">
+                            <span th:if="${p.isLowStock()}" class="badge bg-danger p-2" th:text="${p.stockQuantity} + ' un (Baixo!)'"></span>
+                            <span th:if="${!p.isLowStock()}" class="badge bg-success p-2" th:text="${p.stockQuantity} + ' un'"></span>
+                            <div class="small text-muted" th:text="'Mín: ' + ${p.minStock}"></div>
+                        </td>
+                        <td class="text-end fw-bold text-success" th:text="'+ R$ ' + ${#numbers.formatDecimal(p.totalStockProfit, 1, 'POINT', 2, 'COMMA')}"></td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-success" data-bs-toggle="modal" th:data-bs-target="'#entryModal' + ${p.id}" title="Dar Entrada de Carga (+)">
+                                    <i class="bi bi-plus-lg"></i> Carga
+                                </button>
+                                <button class="btn btn-outline-danger" data-bs-toggle="modal" th:data-bs-target="'#exitModal' + ${p.id}" title="Registrar Avaria (-)">
+                                    <i class="bi bi-dash-lg"></i> Avaria
+                                </button>
+                                <form th:action="@{/estoque/excluir}" method="post" class="d-inline" onsubmit="return confirm('Deseja excluir este produto do estoque?');">
+                                    <input type="hidden" name="productId" th:value="${p.id}"/>
+                                    <button type="submit" class="btn btn-outline-secondary" title="Excluir"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </div>
+
+                            <!-- Modal Entrada -->
+                            <div class="modal fade" th:id="'entryModal' + ${p.id}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form th:action="@{/estoque/ajuste}" method="post">
+                                            <div class="modal-header bg-success text-white">
+                                                <h5 class="modal-title"><i class="bi bi-box-arrow-in-down me-2"></i>Entrada de Mercadoria / Carga</h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body text-start">
+                                                <p>Produto: <strong th:text="${p.name}"></strong></p>
+                                                <p class="text-muted small">Custo por un: <strong th:text="'R$ ' + ${p.costPrice}"></strong> | Venda: <strong th:text="'R$ ' + ${p.salePrice}"></strong></p>
+                                                <input type="hidden" name="productId" th:value="${p.id}"/>
+                                                <input type="hidden" name="type" value="ENTRADA"/>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Quantidade de Volumes / Fardos recebidos:</label>
+                                                    <input type="number" name="delta" class="form-control" min="1" value="10" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Motivo / Nota Fiscal:</label>
+                                                    <input type="text" name="reason" class="form-control" placeholder="Ex: NF 1234 Cervejaria">
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-success">Confirmar Entrada</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Modal Saída / Avaria -->
+                            <div class="modal fade" th:id="'exitModal' + ${p.id}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form th:action="@{/estoque/ajuste}" method="post">
+                                            <div class="modal-header bg-danger text-white">
+                                                <h5 class="modal-title"><i class="bi bi-exclamation-octagon me-2"></i>Baixa por Avaria / Quebra</h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body text-start">
+                                                <p>Produto: <strong th:text="${p.name}"></strong></p>
+                                                <input type="hidden" name="productId" th:value="${p.id}"/>
+                                                <input type="hidden" name="type" value="SAIDA"/>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Quantidade com Avaria / Quebrada:</label>
+                                                    <input type="number" name="delta" class="form-control" min="1" value="1" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Justificativa da perda:</label>
+                                                    <input type="text" name="reason" class="form-control" placeholder="Ex: Garrafa estourada no descarregamento" required>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-danger">Dar Baixa no Estoque</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<!-- Modal Cadastro de Novo Produto -->
+<div class="modal fade" id="newProductModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form th:action="@{/estoque/salvar}" th:object="${newProduct}" method="post">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Cadastrar Nova Bebida no Catálogo</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Nome da Bebida / Descrição *</label>
+                            <input type="text" th:field="*{name}" class="form-control" placeholder="Ex: Cerveja Heineken 330ml Long Neck" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Categoria *</label>
+                            <select th:field="*{category}" class="form-select" required>
+                                <option value="Cervejas">Cervejas</option>
+                                <option value="Chopp & Barril">Chopp & Barril</option>
+                                <option value="Refrigerantes">Refrigerantes</option>
+                                <option value="Destilados">Destilados</option>
+                                <option value="Vinhos & Espumantes">Vinhos & Espumantes</option>
+                                <option value="Energéticos">Energéticos</option>
+                                <option value="Águas & Sucos">Águas & Sucos</option>
+                                <option value="Gelo & Carvão">Gelo & Carvão</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Tipo de Embalagem *</label>
+                            <select th:field="*{unitType}" class="form-select" required>
+                                <option value="Fardo c/ 12">Fardo c/ 12</option>
+                                <option value="Fardo c/ 24">Fardo c/ 24</option>
+                                <option value="Caixa c/ 24">Caixa c/ 24</option>
+                                <option value="Fardo c/ 6">Fardo c/ 6</option>
+                                <option value="Barril 50L">Barril 50L</option>
+                                <option value="Barril 30L">Barril 30L</option>
+                                <option value="Garrafa Avulsa">Garrafa Avulsa</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-danger">Preço de Custo (R$) *</label>
+                            <input type="number" step="0.01" th:field="*{costPrice}" id="modalCostPrice" class="form-control" placeholder="0.00" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-primary">Preço de Venda (R$) *</label>
+                            <input type="number" step="0.01" th:field="*{salePrice}" id="modalSalePrice" class="form-control" placeholder="0.00" required>
+                        </div>
+
+                        <!-- Card de simulação de lucro em tempo real -->
+                        <div class="col-12">
+                            <div class="p-3 bg-light rounded border border-warning">
+                                <div class="d-flex justify-content-between">
+                                    <span><strong>Simulação de Lucro Unitário:</strong> <span id="simProfit" class="text-success fw-bold">R$ 0,00</span></span>
+                                    <span><strong>Markup sobre Custo:</strong> <span id="simMarkup" class="badge bg-success">+0.0%</span></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Estoque Inicial</label>
+                            <input type="number" th:field="*{stockQuantity}" class="form-control" value="10">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Estoque Mínimo (Alerta)</label>
+                            <input type="number" th:field="*{minStock}" class="form-control" value="5">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Fornecedor</label>
+                            <input type="text" th:field="*{supplier}" class="form-control" placeholder="Ambev, Heineken, FEMSA...">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Código de Barras (EAN)</label>
+                            <input type="text" th:field="*{barcode}" class="form-control" placeholder="Ex: 789123456789">
+                        </div>
+                        <div class="col-md-6 d-flex align-items-center mt-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" th:field="*{isReturnable}" id="checkReturnable">
+                                <label class="form-check-label fw-semibold" for="checkReturnable">
+                                    Requer Vasilhame / Casco Retornável
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Produto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const costInput = document.getElementById('modalCostPrice');
+    const saleInput = document.getElementById('modalSalePrice');
+    const simProfit = document.getElementById('simProfit');
+    const simMarkup = document.getElementById('simMarkup');
+
+    function updateSimulation() {
+        const cost = parseFloat(costInput.value) || 0;
+        const sale = parseFloat(saleInput.value) || 0;
+        const profit = sale - cost;
+        const markup = cost > 0 ? ((profit / cost) * 100) : 0;
+
+        simProfit.textContent = (profit >= 0 ? '+ ' : '') + 'R$ ' + profit.toFixed(2);
+        simProfit.className = profit >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold';
+
+        simMarkup.textContent = (markup >= 0 ? '+' : '') + markup.toFixed(1) + '% Markup';
+        simMarkup.className = profit >= 0 ? 'badge bg-success' : 'badge bg-danger';
+    }
+
+    if (costInput && saleInput) {
+        costInput.addEventListener('input', updateSimulation);
+        saleInput.addEventListener('input', updateSimulation);
+    }
+</script>
+
+<footer th:replace="~{layout :: footer}"></footer>
+</body>
+</html>
